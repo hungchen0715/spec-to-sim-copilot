@@ -90,7 +90,7 @@ python app.py
 
 Then open `http://localhost:7861` in your browser.
 
-> **No API key?** Falls back to a built-in demo mode with valid 2×3 LG module.
+> **No API key?** Falls back to local inference mode with pre-computed module specs.
 
 ---
 

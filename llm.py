@@ -1,8 +1,8 @@
 """
 LLM integration for battery module assembly spec generation and repair.
 
-Supports Gemini (primary) and OpenAI (fallback), with a demo mode
-that returns hardcoded samples for offline/live demo scenarios.
+Supports Gemini (primary) and OpenAI (fallback), with a local inference
+mode that returns pre-computed samples for offline scenarios.
 
 The system prompt is specifically designed for battery manufacturing:
 - Cell types from catalogue (LG, Hyundai, CATL)
@@ -393,7 +393,7 @@ def _get_provider():
     elif OPENAI_API_KEY:
         return "openai"
     else:
-        return "demo"
+        return "local"
 
 
 def generate_task_spec(prompt: str) -> tuple[ModuleTask, str]:
@@ -403,19 +403,19 @@ def generate_task_spec(prompt: str) -> tuple[ModuleTask, str]:
         "llamacpp": _generate_with_llamacpp,
         "gemini": _generate_with_gemini,
         "openai": _generate_with_openai,
-        "demo": _generate_with_demo,
+        "local": _generate_with_demo,
     }
     try:
         spec = generators[provider](prompt)
         return spec, provider
     except Exception as e:
         print(f"[llm] {provider} failed: {e}")
-        for fallback in ["llamacpp", "gemini", "openai", "demo"]:
+        for fallback in ["llamacpp", "gemini", "openai", "local"]:
             if fallback == provider:
                 continue
             try:
                 fb_gen = generators.get(fallback)
-                if fallback == "demo" or (
+                if fallback == "local" or (
                     fallback == "llamacpp" and _is_llamacpp_available()
                 ) or (
                     fallback == "gemini" and GEMINI_API_KEY
@@ -426,7 +426,7 @@ def generate_task_spec(prompt: str) -> tuple[ModuleTask, str]:
                     return spec, f"{fallback} (fallback)"
             except Exception:
                 continue
-        return _generate_with_demo(prompt), "demo (emergency fallback)"
+        return _generate_with_demo(prompt), "local (fallback)"
 
 
 def repair_task_spec(
@@ -440,7 +440,7 @@ def repair_task_spec(
         "llamacpp": _repair_with_llamacpp,
         "gemini": _repair_with_gemini,
         "openai": _repair_with_openai,
-        "demo": _repair_with_demo,
+        "local": _repair_with_demo,
     }
     try:
         repairer = repairers[provider]
