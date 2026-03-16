@@ -19,6 +19,7 @@ from config import (
     GEMINI_MODEL, OPENAI_MODEL,
     LLM_PROVIDER, MAX_REPAIR_ATTEMPTS,
     CELL_CATALOG, ROBOT_PROFILES,
+    LLAMACPP_BASE_URL, LLAMACPP_MODEL,
 )
 
 
@@ -176,9 +177,51 @@ def _repair_with_openai(original_prompt: str, spec: ModuleTask, errors: str) -> 
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Provider: Llama.cpp (local, OpenAI-compatible API)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+def _generate_with_llamacpp(prompt: str) -> ModuleTask:
+    from openai import OpenAI
+    client = OpenAI(base_url=LLAMACPP_BASE_URL, api_key="not-needed")
+    response = client.chat.completions.create(
+        model=LLAMACPP_MODEL,
+        response_format={"type": "json_object"},
+        messages=[
+            {"role": "system", "content": _get_system_prompt()},
+            {"role": "user", "content": prompt},
+        ],
+        temperature=0.7,
+    )
+    data = json.loads(response.choices[0].message.content)
+    return ModuleTask(**data)
+
+
+def _repair_with_llamacpp(original_prompt: str, spec: ModuleTask, errors: str) -> ModuleTask:
+    from openai import OpenAI
+    client = OpenAI(base_url=LLAMACPP_BASE_URL, api_key="not-needed")
+    repair_msg = REPAIR_PROMPT.format(
+        original_prompt=original_prompt,
+        spec_json=spec.model_dump_json(indent=2),
+        errors=errors,
+    )
+    response = client.chat.completions.create(
+        model=LLAMACPP_MODEL,
+        response_format={"type": "json_object"},
+        messages=[
+            {"role": "system", "content": _get_system_prompt()},
+            {"role": "user", "content": repair_msg},
+        ],
+        temperature=0.3,
+    )
+    data = json.loads(response.choices[0].message.content)
+    return ModuleTask(**data)
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # Provider: Demo (offline fallback)
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-_DEMO_SPEC = ModuleTask(
+
+# Scenario A: Valid 2x3 LG module (everything correct)
+_DEMO_VALID = ModuleTask(
     task_id="BatteryModule_2x3_LG",
     description="2x3 LG E63 cell module assembly with UR10e robot arm",
     cells=[
@@ -208,24 +251,143 @@ _DEMO_SPEC = ModuleTask(
     module_tray_bounds=[0.8, 0.6, 0.3],
 )
 
+# Scenario B: Overcrowded — 20 HY cells packed too tightly, some out of tray
+_DEMO_CROWDED = ModuleTask(
+    task_id="BatteryModule_20_HY_Dense",
+    description="20 HY 50Ah cells packed in single row — intentionally overcrowded",
+    cells=[
+        CellSpec(id=f"Cell_{i:02d}", cell_type=CellType.HY_50Ah,
+                 position=[0.050 + i * 0.040, 0.150, 0.0], rotation_y=0.0)
+        for i in range(20)
+    ],
+    robot=RobotConfig(
+        model=RobotModel.KUKA_KR6,
+        base_position=[0.0, 0.0, 0.0],
+        gripper=GripperType.CLAMP,
+    ),
+    camera=InspectionCamera(
+        position=[0.4, 0.3, 0.6],
+        look_at=[0.4, 0.3, 0.0],
+        fov=75.0,
+    ),
+    module_tray_bounds=[0.5, 0.3, 0.3],
+)
+
+# Scenario C: Bad placement — Cell_05 out of reach, Cell_03 wrong rotation
+_DEMO_BAD = ModuleTask(
+    task_id="CATL_Module_BadPlacement",
+    description="6 CATL LFP cells with intentional placement and rotation errors",
+    cells=[
+        CellSpec(id="Cell_01", cell_type=CellType.CATL_LFP,
+                 position=[0.200, 0.150, 0.0], rotation_y=0.0),
+        CellSpec(id="Cell_02", cell_type=CellType.CATL_LFP,
+                 position=[0.260, 0.150, 0.0], rotation_y=0.0),
+        CellSpec(id="Cell_03", cell_type=CellType.CATL_LFP,
+                 position=[0.320, 0.150, 0.0], rotation_y=45.0),     # ← BAD: 45°
+        CellSpec(id="Cell_04", cell_type=CellType.CATL_LFP,
+                 position=[0.200, 0.330, 0.0], rotation_y=0.0),
+        CellSpec(id="Cell_05", cell_type=CellType.CATL_LFP,
+                 position=[2.500, 1.000, 0.0], rotation_y=0.0),      # ← OUT OF REACH
+        CellSpec(id="Cell_06", cell_type=CellType.CATL_LFP,
+                 position=[0.320, 0.330, 0.0], rotation_y=0.0),
+    ],
+    robot=RobotConfig(
+        model=RobotModel.FANUC_CRX10,
+        base_position=[0.0, 0.0, 0.0],
+        gripper=GripperType.VACUUM,
+    ),
+    camera=InspectionCamera(
+        position=[0.4, 0.3, 0.6],
+        look_at=[0.4, 0.3, 0.0],
+        fov=60.0,
+    ),
+)
+
+# Scenario C repaired: Cell_03 rotation fixed, Cell_05 moved within reach
+_DEMO_BAD_REPAIRED = ModuleTask(
+    task_id="CATL_Module_Repaired",
+    description="6 CATL LFP cells — repaired: rotation fixed, placement corrected",
+    cells=[
+        CellSpec(id="Cell_01", cell_type=CellType.CATL_LFP,
+                 position=[0.200, 0.150, 0.0], rotation_y=0.0),
+        CellSpec(id="Cell_02", cell_type=CellType.CATL_LFP,
+                 position=[0.260, 0.150, 0.0], rotation_y=0.0),
+        CellSpec(id="Cell_03", cell_type=CellType.CATL_LFP,
+                 position=[0.320, 0.150, 0.0], rotation_y=0.0),      # ← FIXED: 0°
+        CellSpec(id="Cell_04", cell_type=CellType.CATL_LFP,
+                 position=[0.200, 0.330, 0.0], rotation_y=0.0),
+        CellSpec(id="Cell_05", cell_type=CellType.CATL_LFP,
+                 position=[0.380, 0.330, 0.0], rotation_y=0.0),      # ← FIXED: moved close
+        CellSpec(id="Cell_06", cell_type=CellType.CATL_LFP,
+                 position=[0.320, 0.330, 0.0], rotation_y=0.0),
+    ],
+    robot=RobotConfig(
+        model=RobotModel.FANUC_CRX10,
+        base_position=[0.0, 0.0, 0.0],
+        gripper=GripperType.VACUUM,
+    ),
+    camera=InspectionCamera(
+        position=[0.4, 0.3, 0.6],
+        look_at=[0.4, 0.3, 0.0],
+        fov=60.0,
+    ),
+)
+
+
+def _detect_demo_scenario(prompt: str) -> str:
+    """Match the prompt to one of the 3 demo scenarios."""
+    p = prompt.lower()
+    # Scenario B keywords: overcrowded / packed / 20 / tightly / single row
+    if any(kw in p for kw in ["20", "tightly", "packed", "single row", "crowded", "dense"]):
+        return "crowded"
+    # Scenario C keywords: far / rotate / 45 / out of reach / Cell_05
+    if any(kw in p for kw in ["45", "far", "rotate", "cell_05", "out of reach", "2.5"]):
+        return "bad"
+    # Default: valid scenario
+    return "valid"
+
 
 def _generate_with_demo(prompt: str) -> ModuleTask:
-    return _DEMO_SPEC
+    scenario = _detect_demo_scenario(prompt)
+    if scenario == "crowded":
+        return _DEMO_CROWDED
+    elif scenario == "bad":
+        return _DEMO_BAD
+    return _DEMO_VALID
 
 
 def _repair_with_demo(original_prompt: str, spec: ModuleTask, errors: str) -> ModuleTask:
-    return _DEMO_SPEC
+    scenario = _detect_demo_scenario(original_prompt)
+    if scenario == "bad":
+        return _DEMO_BAD_REPAIRED
+    # For crowded scenario, return valid as a "simplified" repair
+    return _DEMO_VALID
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # Public API
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+def _is_llamacpp_available() -> bool:
+    """Check if llama.cpp server is reachable."""
+    try:
+        import urllib.request
+        url = LLAMACPP_BASE_URL.replace("/v1", "/health")
+        req = urllib.request.urlopen(url, timeout=2)
+        return req.status == 200
+    except Exception:
+        return False
+
+
 def _get_provider():
     provider = LLM_PROVIDER.lower()
-    if provider == "gemini" and GEMINI_API_KEY:
+    if provider == "llamacpp" and _is_llamacpp_available():
+        return "llamacpp"
+    elif provider == "gemini" and GEMINI_API_KEY:
         return "gemini"
     elif provider == "openai" and OPENAI_API_KEY:
         return "openai"
+    elif _is_llamacpp_available():
+        return "llamacpp"
     elif GEMINI_API_KEY:
         return "gemini"
     elif OPENAI_API_KEY:
@@ -238,6 +400,7 @@ def generate_task_spec(prompt: str) -> tuple[ModuleTask, str]:
     """Generate a ModuleTask from a natural-language prompt."""
     provider = _get_provider()
     generators = {
+        "llamacpp": _generate_with_llamacpp,
         "gemini": _generate_with_gemini,
         "openai": _generate_with_openai,
         "demo": _generate_with_demo,
@@ -247,12 +410,14 @@ def generate_task_spec(prompt: str) -> tuple[ModuleTask, str]:
         return spec, provider
     except Exception as e:
         print(f"[llm] {provider} failed: {e}")
-        for fallback in ["gemini", "openai", "demo"]:
+        for fallback in ["llamacpp", "gemini", "openai", "demo"]:
             if fallback == provider:
                 continue
             try:
                 fb_gen = generators.get(fallback)
                 if fallback == "demo" or (
+                    fallback == "llamacpp" and _is_llamacpp_available()
+                ) or (
                     fallback == "gemini" and GEMINI_API_KEY
                 ) or (
                     fallback == "openai" and OPENAI_API_KEY
@@ -261,7 +426,7 @@ def generate_task_spec(prompt: str) -> tuple[ModuleTask, str]:
                     return spec, f"{fallback} (fallback)"
             except Exception:
                 continue
-        return _DEMO_SPEC, "demo (emergency fallback)"
+        return _generate_with_demo(prompt), "demo (emergency fallback)"
 
 
 def repair_task_spec(
@@ -272,6 +437,7 @@ def repair_task_spec(
     """Ask the LLM to fix validation errors."""
     provider = _get_provider()
     repairers = {
+        "llamacpp": _repair_with_llamacpp,
         "gemini": _repair_with_gemini,
         "openai": _repair_with_openai,
         "demo": _repair_with_demo,

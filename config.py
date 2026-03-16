@@ -14,6 +14,11 @@ GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", "gemini")
 
+# ── Llama.cpp Server Settings ──
+# llama.cpp exposes an OpenAI-compatible API
+LLAMACPP_BASE_URL = os.getenv("LLAMACPP_BASE_URL", "http://127.0.0.1:8081/v1")
+LLAMACPP_MODEL = os.getenv("LLAMACPP_MODEL", "local-model")
+
 # ── Repair Loop ──
 MAX_REPAIR_ATTEMPTS = 3
 
