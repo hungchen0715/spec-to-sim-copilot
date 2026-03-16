@@ -1,0 +1,1 @@
+Create a large dense battery module with 20 Hyundai 50Ah prismatic cells packed as tightly as possible in a single long row on a small 0.5m x 0.3m tray. Use a KUKA KR6 robot arm.

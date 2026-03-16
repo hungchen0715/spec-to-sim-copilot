@@ -1,0 +1,1 @@
+Assemble a 2x3 grid of LG E63 battery cells into a standard module tray. Use a UR10e robot arm with vacuum gripper positioned at the origin. Place an overhead inspection camera about 0.6 meters above the module center. Cells should start from approximately x=0.2, y=0.15 with standard thermal safety spacing.

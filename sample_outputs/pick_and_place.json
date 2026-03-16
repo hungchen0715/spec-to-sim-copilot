@@ -1,0 +1,93 @@
+{
+  "task_id": "BatteryModule_2x3_LG",
+  "description": "2x3 LG E63 cell module assembly with UR10e robot arm",
+  "cells": [
+    {
+      "id": "Cell_01",
+      "cell_type": "LG_E63",
+      "position": [
+        0.200,
+        0.150,
+        0.0
+      ],
+      "rotation_y": 0.0
+    },
+    {
+      "id": "Cell_02",
+      "cell_type": "LG_E63",
+      "position": [
+        0.256,
+        0.150,
+        0.0
+      ],
+      "rotation_y": 0.0
+    },
+    {
+      "id": "Cell_03",
+      "cell_type": "LG_E63",
+      "position": [
+        0.312,
+        0.150,
+        0.0
+      ],
+      "rotation_y": 0.0
+    },
+    {
+      "id": "Cell_04",
+      "cell_type": "LG_E63",
+      "position": [
+        0.200,
+        0.280,
+        0.0
+      ],
+      "rotation_y": 0.0
+    },
+    {
+      "id": "Cell_05",
+      "cell_type": "LG_E63",
+      "position": [
+        0.256,
+        0.280,
+        0.0
+      ],
+      "rotation_y": 0.0
+    },
+    {
+      "id": "Cell_06",
+      "cell_type": "LG_E63",
+      "position": [
+        0.312,
+        0.280,
+        0.0
+      ],
+      "rotation_y": 0.0
+    }
+  ],
+  "robot": {
+    "model": "UR10e",
+    "base_position": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "gripper": "Vacuum_Gripper_V1"
+  },
+  "camera": {
+    "position": [
+      0.4,
+      0.3,
+      0.6
+    ],
+    "look_at": [
+      0.4,
+      0.3,
+      0.0
+    ],
+    "fov": 60.0
+  },
+  "module_tray_bounds": [
+    0.8,
+    0.6,
+    0.3
+  ]
+}

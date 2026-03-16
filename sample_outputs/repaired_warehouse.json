@@ -1,0 +1,113 @@
+{
+    "task_id": "BatteryModule_2x4_HY_Repaired",
+    "description": "Repaired 2x4 HY 50Ah module — reduced from 20 to 8 cells with proper spacing",
+    "cells": [
+        {
+            "id": "Cell_01",
+            "cell_type": "HY_50Ah",
+            "position": [
+                0.250,
+                0.100,
+                0.0
+            ],
+            "rotation_y": 0.0
+        },
+        {
+            "id": "Cell_02",
+            "cell_type": "HY_50Ah",
+            "position": [
+                0.298,
+                0.100,
+                0.0
+            ],
+            "rotation_y": 0.0
+        },
+        {
+            "id": "Cell_03",
+            "cell_type": "HY_50Ah",
+            "position": [
+                0.346,
+                0.100,
+                0.0
+            ],
+            "rotation_y": 0.0
+        },
+        {
+            "id": "Cell_04",
+            "cell_type": "HY_50Ah",
+            "position": [
+                0.394,
+                0.100,
+                0.0
+            ],
+            "rotation_y": 0.0
+        },
+        {
+            "id": "Cell_05",
+            "cell_type": "HY_50Ah",
+            "position": [
+                0.250,
+                0.252,
+                0.0
+            ],
+            "rotation_y": 0.0
+        },
+        {
+            "id": "Cell_06",
+            "cell_type": "HY_50Ah",
+            "position": [
+                0.298,
+                0.252,
+                0.0
+            ],
+            "rotation_y": 0.0
+        },
+        {
+            "id": "Cell_07",
+            "cell_type": "HY_50Ah",
+            "position": [
+                0.346,
+                0.252,
+                0.0
+            ],
+            "rotation_y": 0.0
+        },
+        {
+            "id": "Cell_08",
+            "cell_type": "HY_50Ah",
+            "position": [
+                0.394,
+                0.252,
+                0.0
+            ],
+            "rotation_y": 0.0
+        }
+    ],
+    "robot": {
+        "model": "KUKA_KR6",
+        "base_position": [
+            0.0,
+            0.0,
+            0.0
+        ],
+        "gripper": "Mechanical_Clamp_V2"
+    },
+    "camera": {
+        "position": [
+            0.3,
+            0.2,
+            0.5
+        ],
+        "look_at": [
+            0.3,
+            0.2,
+            0.0
+        ],
+        "fov": 70.0
+    },
+    "module_tray_bounds": [
+        0.8,
+        0.6,
+        0.3
+    ]
+}

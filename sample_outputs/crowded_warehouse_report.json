@@ -1,0 +1,25 @@
+{
+    "validation_passed": false,
+    "issues": [
+        {
+            "rule": "cell_count",
+            "severity": "warning",
+            "message": "Module has 20 cells — approaching station limit (16 recommended max)."
+        },
+        {
+            "rule": "thermal_safety_gap",
+            "severity": "error",
+            "message": "Safety Violation: Cell_03 and Cell_04 are 43.0mm apart. Min required: 48.0mm (45mm + 3mm gap)."
+        },
+        {
+            "rule": "tray_bounds",
+            "severity": "error",
+            "message": "Cell_18 extends outside module tray on X-axis. Cell at x=0.520m, tray width=0.500m."
+        },
+        {
+            "rule": "robot_reachability",
+            "severity": "error",
+            "message": "OUT OF REACH: Cell_20 at [0.520, 0.250, 0.000] is 0.580m too far. KUKA_KR6 max reach is 0.900m from base at [0.0, -0.5, 0.0]."
+        }
+    ]
+}

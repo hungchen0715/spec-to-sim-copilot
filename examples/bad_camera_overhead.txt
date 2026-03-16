@@ -1,0 +1,1 @@
+Assemble 6 CATL LFP battery cells into a module. But place Cell_05 at coordinates [2.5, 1.0, 0.0] which is very far from the robot. Also set Cell_03 rotation to 45 degrees. Use a FANUC CRX10 robot at the origin.
