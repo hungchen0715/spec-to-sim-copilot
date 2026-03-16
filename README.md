@@ -11,6 +11,8 @@ for EV battery module assembly in NVIDIA Isaac Sim.
 - **LLM self-correction loop** — the AI fixes its own errors  
 - **Top-down layout preview** with robot reach envelope visualization  
 
+![Architecture](assets/ezgif.com-animated-gif-maker.gif)
+![Architecture](assets/2026-03-1611-13-59-ezgif.com-video-to-gif-converter.gif)
 ---
 
 ## Why This Matters
