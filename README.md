@@ -12,6 +12,23 @@ for EV battery module assembly in NVIDIA Isaac Sim.
 - **Top-down layout preview** with robot reach envelope visualization  
 
 ![Architecture](assets/ezgif.com-animated-gif-maker.gif)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ![Architecture](assets/2026-03-1611-13-59-ezgif.com-video-to-gif-converter.gif)
 ---
 
