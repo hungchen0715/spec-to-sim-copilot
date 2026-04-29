@@ -167,7 +167,7 @@ is generalizable beyond battery assembly to any spatial LLM application.
 
 ## Limitations
 
-- **No actual USD export yet** — generates the validated spec, not the `.usd` file  
+- **USD export is text-based USDA** — uses template generation, not the pxr Python SDK  
 - **2D preview only** — no 3D rendering (would require Isaac Sim installed)  
 - **Cell catalogue is small** — 3 cell types from specs I could find publicly  
 - **Robot reach is simplified** — uses spherical envelope, not actual joint kinematics  
@@ -184,11 +184,14 @@ These are deliberate scope boundaries. The point is to demonstrate the
 ```
 spec-to-sim-copilot/
 ├── app.py            — Gradio UI (port 7861)
+├── cli.py            — Headless CLI for pipeline integration
 ├── schema.py         — Pydantic models (ModuleTask, CellSpec, RobotConfig)
 ├── llm.py            — LLM integration (generate + repair)
 ├── validator.py      — 5 industrial validation rules
+├── usd_export.py     — ModuleTask → USDA scene exporter
 ├── preview.py        — matplotlib assembly layout renderer
 ├── config.py         — Robot profiles, cell catalogue, constants
+├── tests/            — Unit tests for validator
 ├── examples/         — Input prompts for 3 scenarios
 ├── sample_outputs/   — Expected JSON outputs
 ├── assets/           — Architecture diagram
@@ -201,3 +204,10 @@ spec-to-sim-copilot/
 ## License
 
 MIT
+
+---
+## 🔗 Battery Factory Pipeline Integration
+
+This repository is a core module within the top-level [battery-sim-pipeline](../battery-sim-pipeline).
+It provides LLM-driven spec generation, industrial safety validation, and automated USD scene export.
+CI/CD workflows run linting and unit tests on every push.
