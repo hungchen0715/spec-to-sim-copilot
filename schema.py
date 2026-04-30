@@ -8,7 +8,7 @@ Every field maps to real EV battery manufacturing constraints:
 - Thermal safety gaps mandated by cell chemistry
 - Robot work envelope from UR / KUKA / FANUC specs
 """
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional
 from enum import Enum
 
@@ -96,6 +96,75 @@ class InspectionCamera(BaseModel):
     )
 
 
+# ── Conveyor Belt for logistics simulation ──
+class ConveyorBelt(BaseModel):
+    id: str = Field(
+        ...,
+        description="Unique conveyor belt identifier, e.g. 'Conv_01'"
+    )
+    start_position: list[float] = Field(
+        ...,
+        min_length=3,
+        max_length=3,
+        description="Belt start point [x, y, z] in meters"
+    )
+    end_position: list[float] = Field(
+        ...,
+        min_length=3,
+        max_length=3,
+        description="Belt end point [x, y, z] in meters"
+    )
+    speed_mps: float = Field(
+        default=0.5,
+        ge=0.01,
+        le=5.0,
+        description="Belt speed in meters per second"
+    )
+    width: float = Field(
+        default=0.6,
+        ge=0.1,
+        le=2.0,
+        description="Belt width in meters"
+    )
+
+    @field_validator("end_position")
+    @classmethod
+    def end_must_differ_from_start(cls, v, info):
+        start = info.data.get("start_position")
+        if start and v == start:
+            raise ValueError("end_position must differ from start_position")
+        return v
+
+
+# ── Packing Station (robot + conveyor link) ──
+class PackingStation(BaseModel):
+    id: str = Field(
+        ...,
+        description="Unique packing station identifier, e.g. 'Pack_01'"
+    )
+    position: list[float] = Field(
+        ...,
+        min_length=3,
+        max_length=3,
+        description="Station center position [x, y, z] in meters"
+    )
+    robot: RobotConfig = Field(
+        default_factory=RobotConfig,
+        description="Packing robot arm configuration"
+    )
+    conveyor_in: str = Field(
+        ...,
+        description="ID of the incoming conveyor belt feeding this station"
+    )
+    packing_time_s: float = Field(
+        default=12.0,
+        ge=1.0,
+        le=120.0,
+        description="Average time to pack one module (seconds)"
+    )
+
+
+
 # ── Top-level: Complete Module Assembly Task ──
 class ModuleTask(BaseModel):
     task_id: str = Field(
@@ -124,4 +193,12 @@ class ModuleTask(BaseModel):
         min_length=3,
         max_length=3,
         description="Module tray dimensions [x, y, z] in meters"
+    )
+    conveyors: Optional[list[ConveyorBelt]] = Field(
+        default=None,
+        description="Optional conveyor belts in the assembly line"
+    )
+    packing_stations: Optional[list[PackingStation]] = Field(
+        default=None,
+        description="Optional packing stations for module packaging"
     )

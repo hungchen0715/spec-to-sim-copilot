@@ -21,6 +21,8 @@ from config import (
     ROBOT_PROFILES,
     MAX_CELLS_PER_MODULE,
     MAX_CELLS_WARNING,
+    CONVEYOR_CONSTRAINTS,
+    PACKING_STATION_CONSTRAINTS,
 )
 
 
@@ -337,6 +339,177 @@ def _check_cell_count(spec: ModuleTask) -> list[ValidationIssue]:
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Rule 6: Conveyor Belt Collision Detection
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+def _check_conveyor_collision(spec: ModuleTask) -> list[ValidationIssue]:
+    """
+    Domain rationale: Conveyor belts on a factory floor cannot overlap
+    or intersect each other. If two belts occupy the same space, physical
+    modules will collide during transport.
+
+    Also validates belt length against practical factory constraints.
+    """
+    issues = []
+    conveyors = spec.conveyors
+    if not conveyors:
+        return issues
+
+    margin = CONVEYOR_CONSTRAINTS["overlap_margin"]
+    min_len = CONVEYOR_CONSTRAINTS["min_length"]
+    max_len = CONVEYOR_CONSTRAINTS["max_length"]
+
+    for conv in conveyors:
+        # Check belt length
+        belt_length = _distance_3d(conv.start_position, conv.end_position)
+        if belt_length < min_len:
+            issues.append(ValidationIssue(
+                rule="conveyor_collision",
+                severity=Severity.ERROR,
+                message=(
+                    f"Conveyor {conv.id} is only {belt_length:.3f}m long. "
+                    f"Minimum belt length is {min_len}m."
+                ),
+                fix_hint=(
+                    f"Move the start or end position of {conv.id} so the belt "
+                    f"is at least {min_len}m long."
+                )
+            ))
+        elif belt_length > max_len:
+            issues.append(ValidationIssue(
+                rule="conveyor_collision",
+                severity=Severity.WARNING,
+                message=(
+                    f"Conveyor {conv.id} is {belt_length:.3f}m long — exceeds "
+                    f"typical factory limit of {max_len}m."
+                ),
+                fix_hint=(
+                    f"Consider splitting {conv.id} into two shorter segments "
+                    f"with a transfer station."
+                )
+            ))
+
+    # Check pairwise overlap (axis-aligned bounding box)
+    for i in range(len(conveyors)):
+        for j in range(i + 1, len(conveyors)):
+            c_a = conveyors[i]
+            c_b = conveyors[j]
+
+            # Compute midpoint distance as simple collision proxy
+            mid_a = [(s + e) / 2 for s, e in zip(c_a.start_position, c_a.end_position)]
+            mid_b = [(s + e) / 2 for s, e in zip(c_b.start_position, c_b.end_position)]
+            dist = _distance_3d(mid_a, mid_b)
+
+            # Min safe distance = half-widths + margin
+            min_safe = (c_a.width / 2) + (c_b.width / 2) + margin
+
+            if dist < min_safe:
+                issues.append(ValidationIssue(
+                    rule="conveyor_collision",
+                    severity=Severity.ERROR,
+                    message=(
+                        f"Conveyors {c_a.id} and {c_b.id} are too close "
+                        f"(midpoint distance: {dist:.3f}m, min required: {min_safe:.3f}m)."
+                    ),
+                    fix_hint=(
+                        f"Move {c_b.id} at least {min_safe:.3f}m away from {c_a.id} "
+                        f"(accounting for belt widths + {margin*1000:.0f}mm safety margin)."
+                    )
+                ))
+
+    return issues
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Rule 7: Packing Station Robot Reachability
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+def _check_packing_reach(spec: ModuleTask) -> list[ValidationIssue]:
+    """
+    Domain rationale: A packing station's robot arm must be able to
+    physically reach the end of its connected conveyor belt to pick
+    up modules. If the station is too far from the conveyor endpoint,
+    the packing operation cannot execute.
+
+    Also validates that the referenced conveyor_in ID actually exists.
+    """
+    issues = []
+    stations = spec.packing_stations
+    conveyors = spec.conveyors
+
+    if not stations:
+        return issues
+
+    # Build conveyor lookup
+    conveyor_map = {}
+    if conveyors:
+        conveyor_map = {c.id: c for c in conveyors}
+
+    max_reach = PACKING_STATION_CONSTRAINTS["max_reach_to_conveyor"]
+
+    for station in stations:
+        # Check if referenced conveyor exists
+        if station.conveyor_in not in conveyor_map:
+            issues.append(ValidationIssue(
+                rule="packing_reach",
+                severity=Severity.ERROR,
+                message=(
+                    f"Packing station {station.id} references conveyor "
+                    f"'{station.conveyor_in}' which does not exist."
+                ),
+                fix_hint=(
+                    f"Add a ConveyorBelt with id='{station.conveyor_in}' to the spec, "
+                    f"or update {station.id}'s conveyor_in to an existing belt ID."
+                )
+            ))
+            continue
+
+        # Check reach to conveyor endpoint
+        conveyor = conveyor_map[station.conveyor_in]
+        dist_to_end = _distance_3d(station.position, conveyor.end_position)
+
+        # Also get robot-specific reach limit
+        robot_profile = ROBOT_PROFILES.get(
+            station.robot.model.value, ROBOT_PROFILES["UR10e"]
+        )
+        effective_reach = min(max_reach, robot_profile["max_reach"])
+
+        if dist_to_end > effective_reach:
+            issues.append(ValidationIssue(
+                rule="packing_reach",
+                severity=Severity.ERROR,
+                message=(
+                    f"Packing station {station.id} is {dist_to_end:.3f}m from "
+                    f"conveyor {conveyor.id} endpoint. "
+                    f"{station.robot.model.value} max reach is {effective_reach}m."
+                ),
+                fix_hint=(
+                    f"Move {station.id} closer to the end of conveyor {conveyor.id}, "
+                    f"or use a robot with longer reach. Max distance: {effective_reach}m."
+                )
+            ))
+
+    # Check packing station clearance
+    min_clear = PACKING_STATION_CONSTRAINTS["min_clearance"]
+    for i in range(len(stations)):
+        for j in range(i + 1, len(stations)):
+            dist = _distance_3d(stations[i].position, stations[j].position)
+            if dist < min_clear:
+                issues.append(ValidationIssue(
+                    rule="packing_reach",
+                    severity=Severity.WARNING,
+                    message=(
+                        f"Packing stations {stations[i].id} and {stations[j].id} "
+                        f"are only {dist:.3f}m apart (min: {min_clear}m)."
+                    ),
+                    fix_hint=(
+                        f"Space packing stations at least {min_clear}m apart "
+                        f"to avoid robot arm collisions."
+                    )
+                ))
+
+    return issues
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # Main validation entry point
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 def validate(spec: ModuleTask) -> ValidationReport:
@@ -348,6 +521,8 @@ def validate(spec: ModuleTask) -> ValidationReport:
     all_issues.extend(_check_robot_reach(spec))
     all_issues.extend(_check_tray_bounds(spec))
     all_issues.extend(_check_cell_count(spec))
+    all_issues.extend(_check_conveyor_collision(spec))
+    all_issues.extend(_check_packing_reach(spec))
 
     has_errors = any(i.severity == Severity.ERROR for i in all_issues)
 

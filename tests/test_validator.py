@@ -1,11 +1,13 @@
 import unittest
-from schema import ModuleTask, CellSpec, RobotConfig, CellType, RobotModel, GripperType
+from schema import (
+    ModuleTask, CellSpec, RobotConfig, CellType, RobotModel,
+    GripperType, InspectionCamera, ConveyorBelt, PackingStation,
+)
 from validator import validate, Severity
 
 class TestValidator(unittest.TestCase):
 
     def setUp(self):
-        from schema import InspectionCamera
         self.base_spec = ModuleTask(
             task_id="Test_Task_01",
             description="Unit test task",
@@ -36,5 +38,108 @@ class TestValidator(unittest.TestCase):
         self.assertFalse(report.passed)
         self.assertTrue(any(i.rule == "robot_reachability" for i in report.issues))
 
+    # ── Conveyor Belt Tests ──
+
+    def test_valid_conveyor_spec(self):
+        """A valid conveyor + packing station should pass all rules."""
+        self.base_spec.conveyors = [
+            ConveyorBelt(
+                id="Conv_01",
+                start_position=[0.0, 0.0, 0.0],
+                end_position=[2.0, 0.0, 0.0],
+                speed_mps=0.5,
+                width=0.6,
+            ),
+        ]
+        self.base_spec.packing_stations = [
+            PackingStation(
+                id="Pack_01",
+                position=[2.0, 0.5, 0.0],
+                conveyor_in="Conv_01",
+            ),
+        ]
+        report = validate(self.base_spec)
+        self.assertTrue(report.passed)
+
+    def test_conveyor_too_short(self):
+        """A conveyor belt shorter than 0.5m should trigger an error."""
+        self.base_spec.conveyors = [
+            ConveyorBelt(
+                id="Conv_Short",
+                start_position=[0.0, 0.0, 0.0],
+                end_position=[0.1, 0.0, 0.0],  # Only 0.1m
+                width=0.6,
+            ),
+        ]
+        report = validate(self.base_spec)
+        self.assertFalse(report.passed)
+        self.assertTrue(any(
+            i.rule == "conveyor_collision" and i.severity == Severity.ERROR
+            for i in report.issues
+        ))
+
+    def test_conveyors_overlap(self):
+        """Two conveyors placed too close should trigger collision error."""
+        self.base_spec.conveyors = [
+            ConveyorBelt(
+                id="Conv_A",
+                start_position=[0.0, 0.0, 0.0],
+                end_position=[2.0, 0.0, 0.0],
+                width=0.6,
+            ),
+            ConveyorBelt(
+                id="Conv_B",
+                start_position=[0.0, 0.1, 0.0],  # Too close (0.1m apart, widths 0.6m each)
+                end_position=[2.0, 0.1, 0.0],
+                width=0.6,
+            ),
+        ]
+        report = validate(self.base_spec)
+        self.assertFalse(report.passed)
+        self.assertTrue(any(
+            i.rule == "conveyor_collision" and "too close" in i.message
+            for i in report.issues
+        ))
+
+    # ── Packing Station Tests ──
+
+    def test_packing_station_too_far(self):
+        """Packing station out of robot reach from conveyor endpoint."""
+        self.base_spec.conveyors = [
+            ConveyorBelt(
+                id="Conv_01",
+                start_position=[0.0, 0.0, 0.0],
+                end_position=[2.0, 0.0, 0.0],
+                width=0.6,
+            ),
+        ]
+        self.base_spec.packing_stations = [
+            PackingStation(
+                id="Pack_Far",
+                position=[5.0, 5.0, 0.0],  # Way too far
+                conveyor_in="Conv_01",
+            ),
+        ]
+        report = validate(self.base_spec)
+        self.assertFalse(report.passed)
+        self.assertTrue(any(i.rule == "packing_reach" for i in report.issues))
+
+    def test_packing_station_missing_conveyor(self):
+        """Packing station referencing a non-existent conveyor ID."""
+        self.base_spec.packing_stations = [
+            PackingStation(
+                id="Pack_01",
+                position=[1.0, 0.5, 0.0],
+                conveyor_in="Conv_MISSING",  # Doesn't exist
+            ),
+        ]
+        report = validate(self.base_spec)
+        self.assertFalse(report.passed)
+        self.assertTrue(any(
+            i.rule == "packing_reach" and "does not exist" in i.message
+            for i in report.issues
+        ))
+
 if __name__ == '__main__':
     unittest.main()
+

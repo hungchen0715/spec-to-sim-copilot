@@ -87,3 +87,18 @@ GRIPPER_TYPES = [
     "Mechanical_Clamp_V2",
     "Soft_Finger_V1",
 ]
+
+# ── Conveyor Belt Constraints ──
+CONVEYOR_CONSTRAINTS = {
+    "min_length": 0.5,       # meters — belt must be at least 50cm
+    "max_length": 10.0,      # meters — practical factory limit
+    "overlap_margin": 0.05,  # meters — min clearance between parallel belts
+    "min_speed": 0.01,       # m/s
+    "max_speed": 5.0,        # m/s
+}
+
+# ── Packing Station Constraints ──
+PACKING_STATION_CONSTRAINTS = {
+    "max_reach_to_conveyor": 1.5,  # meters — robot must reach conveyor end
+    "min_clearance": 0.3,          # meters — minimum between stations
+}
